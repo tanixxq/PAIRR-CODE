@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
-import testroutes from "./Routes/TestRoutes.js";
+import authRoutes from "./Routes/authRoutes.js";
+
 
 
 
@@ -15,6 +16,6 @@ app.get("/", (req, res) => {
     });
 });
 
-app.use("/api", testroutes);
+app.use("/api/auth", authRoutes);
 
 export default app;
