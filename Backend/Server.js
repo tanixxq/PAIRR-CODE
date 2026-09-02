@@ -1,19 +1,10 @@
-import express from "express";
-import cors from "cors";
 import dotenv from "dotenv";
+import app from "./src/App.js";
+import { connectDB } from "./src/config/db.js";
 
-dotenv.config();
+dotenv.config();   // 1. load .env into process.env FIRST
 
-const app = express();
-
-app.use(cors());
-app.use(express.json());
-
-app.get("/", (req, res) => {
-    res.json({
-        message: "PAIRCODE API is running 🚀"
-    });
-});
+connectDB();        // 2. now MONGO_URI actually exists
 
 const PORT = process.env.PORT || 3000;
 
