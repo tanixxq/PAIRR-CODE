@@ -2,14 +2,15 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import axios from "axios";
 import { API_URL } from "../config.js";
-import "./Register.css";
+import { useAuth } from "../Context/authContext.jsx";
+import "./Login.css";
 
-function Register() {
-  const [username, setUsername] = useState("");
+function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { login } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -18,8 +19,9 @@ function Register() {
     setIsSubmitting(true);
 
     try {
-      await axios.post(`${API_URL}/auth/register`, { username, email, password });
-      navigate("/login");
+      const res = await axios.post(`${API_URL}/auth/login`, { email, password });
+      login(res.data.token);
+      navigate("/dashboard");
     } catch (error) {
       setMessage(error.response?.data?.message || "Something went wrong");
     } finally {
@@ -30,18 +32,9 @@ function Register() {
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <p className="auth-card__eyebrow">paircode / register<span className="cursor-blink">_</span></p>
-        <h2>Create an account</h2>
+        <p className="auth-card__eyebrow">paircode / login<span className="cursor-blink">_</span></p>
+        <h2>Welcome back</h2>
         <form className="auth-form" onSubmit={handleSubmit}>
-          <div className="auth-field">
-            <label>Username</label>
-            <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              required
-            />
-          </div>
           <div className="auth-field">
             <label>Email</label>
             <input
@@ -61,14 +54,14 @@ function Register() {
             />
           </div>
           <button className="auth-submit" type="submit" disabled={isSubmitting}>
-            {isSubmitting ? "Creating…" : "Create account"}
+            {isSubmitting ? "Logging in…" : "Log in"}
           </button>
         </form>
         {message && <p className="auth-message auth-message--error">❌ {message}</p>}
-        <p className="auth-switch">Already have an account? <Link to="/login">Log in</Link></p>
+        <p className="auth-switch">No account? <Link to="/register">Create one</Link></p>
       </div>
     </div>
   );
 }
 
-export default Register;
+export default Login;

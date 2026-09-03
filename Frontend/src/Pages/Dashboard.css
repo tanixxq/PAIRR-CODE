@@ -1,0 +1,197 @@
+.dashboard {
+    min-height: 100vh;
+    background-color: var(--bg);
+    background-image: radial-gradient(var(--border) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+  
+  .dashboard-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 40px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+  
+  .dashboard-nav__logo {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  
+  .cursor-blink {
+    color: var(--accent-a);
+    animation: blink 1.1s steps(1) infinite;
+  }
+  
+  @keyframes blink {
+    50% { opacity: 0; }
+  }
+  
+  .dashboard-nav__logout {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 13px;
+    padding: 7px 14px;
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease;
+  }
+  
+  .dashboard-nav__logout:hover {
+    border-color: var(--text-muted);
+    color: var(--text);
+  }
+  
+  .dashboard-main {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 64px 24px;
+  }
+  
+  .dashboard-main h1 {
+    font-size: 28px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+  
+  .dashboard-sub {
+    color: var(--text-muted);
+    font-size: 14px;
+    margin-top: 8px;
+    margin-bottom: 40px;
+  }
+  
+  .panel-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+  
+  @media (max-width: 680px) {
+    .panel-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+  
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 32px;
+  }
+  
+  .panel--a {
+    border-left: 3px solid var(--accent-a);
+  }
+  
+  .panel--b {
+    border-left: 3px solid var(--accent-b);
+  }
+  
+  .panel__eyebrow {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+  }
+  
+  .panel h2 {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 24px;
+  }
+  
+  .panel-form {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  
+  .panel-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  
+  .panel-field label {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  
+  .panel-field input {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 10px 12px;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.15s ease;
+  }
+  
+  .room-code-input {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  
+  .panel--a .panel-field input:focus {
+    border-color: var(--accent-a);
+  }
+  
+  .panel--b .panel-field input:focus {
+    border-color: var(--accent-b);
+  }
+  
+  .panel-submit {
+    margin-top: 4px;
+    border: none;
+    color: var(--bg);
+    padding: 11px;
+    font-size: 14px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: opacity 0.15s ease;
+  }
+  
+  .panel-submit:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+  
+  .panel-submit--a {
+    background: var(--accent-a);
+  }
+  
+  .panel-submit--b {
+    background: var(--accent-b);
+  }
+  
+  .panel-submit:hover:not(:disabled) {
+    opacity: 0.88;
+  }
+  
+  .panel-error {
+    color: var(--danger);
+    font-size: 13px;
+    margin-top: 4px;
+  }
+  
+  .room-result {
+    text-align: center;
+    padding: 8px 0;
+  }
+  
+  .room-result__label {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+  
+  .room-result__code {
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: var(--accent-a);
+    margin-bottom: 20px;
+  }
