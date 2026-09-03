@@ -4,6 +4,7 @@ import Landing from "./Pages/Landing.jsx";
 import Login from "./Pages/Login.jsx";
 import Register from "./Pages/Register.jsx";
 import Dashboard from "./Pages/Dashboard.jsx";
+import RoomEditor from "./Pages/RoomEditor.jsx";
 
 import ProtectedRoute from "./Components/ProtectedRoutes.jsx";
 
@@ -18,6 +19,14 @@ function App() {
         element={
           <ProtectedRoute>
             <Dashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/room/:roomCode"
+        element={
+          <ProtectedRoute>
+            <RoomEditor />
           </ProtectedRoute>
         }
       />
