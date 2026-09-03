@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import authRoutes from "./Routes/authRoutes.js";
 import roomRoutes from "./Routes/roomRoutes.js";
+import executeRoutes from "./Routes/executeRoutes.js";
 
 
 
@@ -21,6 +22,7 @@ app.get("/", (req, res) => {
 
 app.use("/api/auth", authRoutes);
 app.use("/api/rooms", roomRoutes);
+app.use("/api/execute", executeRoutes);
 
 
 export default app;
