@@ -3,8 +3,17 @@ import { useParams, Link } from "react-router-dom";
 import { useSocket } from "../Hooks/useSocket.js";
 import Editor from "@monaco-editor/react";
 import "./RoomEditor.css";
+import axios from "axios";
+import { API_URL } from "../config.js";
+import { useAuth } from "../Context/authContext.jsx";
 
-const AVATAR_COLORS = ["#5EEAD4", "#FF8B6B", "#A78BFA", "#FBBF24", "#60A5FA"];
+const AVATAR_COLORS = [
+  "#5EEAD4",
+  "#FF8B6B",
+  "#A78BFA",
+  "#FBBF24",
+  "#60A5FA"
+];
 
 const LANGUAGES = [
   { id: "javascript", label: "JavaScript" },
@@ -16,73 +25,115 @@ const LANGUAGES = [
   { id: "go", label: "Go" }
 ];
 
+const RUN_TIMEOUT_MS = 15000;
+
 function colorForId(id) {
   let hash = 0;
-  for (let i = 0; i < id.length; i++) hash = id.charCodeAt(i) + ((hash << 5) - hash);
+
+  for (let i = 0; i < id.length; i++) {
+    hash = id.charCodeAt(i) + ((hash << 5) - hash);
+  }
+
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
 
 function RoomEditor() {
   const { roomCode } = useParams();
+
   const socketRef = useSocket();
   const editorRef = useRef(null);
   const isRemoteUpdate = useRef(false);
+
+  const { token } = useAuth();
 
   const [users, setUsers] = useState([]);
   const [copied, setCopied] = useState(false);
   const [connected, setConnected] = useState(false);
   const [language, setLanguage] = useState("javascript");
 
+  const [output, setOutput] = useState(null);
+  const [isRunning, setIsRunning] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(false);
+
+  // =========================
+  // SOCKET EVENTS
+  // =========================
+
   useEffect(() => {
     const socket = socketRef.current;
+
     if (!socket) return;
 
-    socket.on("connect", () => {
+    const handleConnect = () => {
       setConnected(true);
       socket.emit("join-room", roomCode);
-    });
+    };
 
-    socket.on("disconnect", () => setConnected(false));
+    const handleDisconnect = () => {
+      setConnected(false);
+    };
 
-    socket.on("room-users", (userList) => {
+    const handleRoomUsers = (userList) => {
       setUsers(userList);
-    });
+    };
 
-    socket.on("init-state", ({ code, language: lang }) => {
+    const handleInitState = ({ code, language: lang }) => {
       const editor = editorRef.current;
+
       if (editor && code) {
         isRemoteUpdate.current = true;
         editor.setValue(code);
         isRemoteUpdate.current = false;
       }
-      if (lang) setLanguage(lang);
-    });
 
-    socket.on("code-change", (code) => {
+      if (lang) {
+        setLanguage(lang);
+      }
+    };
+
+    const handleCodeChange = (code) => {
       const editor = editorRef.current;
+
       if (!editor) return;
 
       const current = editor.getValue();
+
       if (current === code) return;
 
       isRemoteUpdate.current = true;
       editor.setValue(code);
       isRemoteUpdate.current = false;
-    });
+    };
 
-    socket.on("language-change", (lang) => {
+    const handleLanguageChange = (lang) => {
       setLanguage(lang);
-    });
+    };
+
+    socket.on("connect", handleConnect);
+    socket.on("disconnect", handleDisconnect);
+    socket.on("room-users", handleRoomUsers);
+    socket.on("init-state", handleInitState);
+    socket.on("code-change", handleCodeChange);
+    socket.on("language-change", handleLanguageChange);
+
+    // If socket was already connected before this effect ran
+    if (socket.connected) {
+      handleConnect();
+    }
 
     return () => {
-      socket.off("connect");
-      socket.off("disconnect");
-      socket.off("room-users");
-      socket.off("init-state");
-      socket.off("code-change");
-      socket.off("language-change");
+      socket.off("connect", handleConnect);
+      socket.off("disconnect", handleDisconnect);
+      socket.off("room-users", handleRoomUsers);
+      socket.off("init-state", handleInitState);
+      socket.off("code-change", handleCodeChange);
+      socket.off("language-change", handleLanguageChange);
     };
   }, [roomCode, socketRef]);
+
+  // =========================
+  // EDITOR
+  // =========================
 
   const handleEditorMount = (editor) => {
     editorRef.current = editor;
@@ -92,103 +143,321 @@ function RoomEditor() {
     if (isRemoteUpdate.current) return;
 
     const socket = socketRef.current;
+
     if (socket) {
-      socket.emit("code-change", { roomCode, code: value });
+      socket.emit("code-change", {
+        roomCode,
+        code: value
+      });
     }
   };
+
+  // =========================
+  // LANGUAGE
+  // =========================
 
   const handleLanguageChange = (e) => {
     const newLang = e.target.value;
+
     setLanguage(newLang);
 
     const socket = socketRef.current;
+
     if (socket) {
-      socket.emit("language-change", { roomCode, language: newLang });
+      socket.emit("language-change", {
+        roomCode,
+        language: newLang
+      });
     }
   };
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(roomCode);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+  // =========================
+  // COPY ROOM CODE
+  // =========================
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(roomCode);
+
+      setCopied(true);
+
+      setTimeout(() => {
+        setCopied(false);
+      }, 1500);
+    } catch (error) {
+      console.error("Failed to copy room code:", error);
+    }
   };
 
+  // =========================
+  // RUN CODE
+  // =========================
+
+  const handleRun = async () => {
+    const editor = editorRef.current;
+
+    if (!editor) {
+      console.error("Editor is not mounted.");
+      return;
+    }
+
+    const code = editor.getValue();
+
+    setIsRunning(true);
+    setPanelOpen(true);
+    setOutput(null);
+
+    try {
+      const res = await axios.post(
+        `${API_URL}/execute`,
+        {
+          language,
+          code
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          },
+          timeout: RUN_TIMEOUT_MS
+        }
+      );
+
+      console.log("EXECUTE RESPONSE:", res.data);
+
+      setOutput({
+        stdout: res.data.stdout || "",
+        stderr: res.data.stderr || "",
+        exitCode: res.data.exitCode
+      });
+    } catch (error) {
+      console.error("Execution error:", error);
+
+      const timedOut =
+        error.code === "ECONNABORTED" ||
+        /timeout/i.test(error.message || "");
+
+      setOutput({
+        stdout: "",
+        stderr: timedOut
+          ? `Execution timed out after ${
+              RUN_TIMEOUT_MS / 1000
+            }s — check for an infinite loop.`
+          : error.response?.data?.message || "Execution failed",
+        exitCode: 1
+      });
+    } finally {
+      setIsRunning(false);
+    }
+  };
+
+  // =========================
+  // USERS
+  // =========================
+
   const myId = socketRef.current?.id;
+
   const sortedUsers = useMemo(
-    () => [...users].sort((a) => (a === myId ? -1 : 1)),
+    () =>
+      [...users].sort((a, b) => {
+        if (a === myId) return -1;
+        if (b === myId) return 1;
+        return 0;
+      }),
     [users, myId]
   );
 
+  // =========================
+  // JSX
+  // =========================
+
   return (
     <div className="room">
+
+      {/* NAVBAR */}
+
       <nav className="room-nav">
+
         <div className="room-nav__left">
-          <Link to="/dashboard" className="room-nav__back">←</Link>
-          <span className="room-nav__title">paircode</span>
-          <button className="room-code-pill" onClick={handleCopy}>
-            {roomCode} <span className="room-code-pill__action">{copied ? "copied" : "copy"}</span>
+
+          <Link
+            to="/dashboard"
+            className="room-nav__back"
+          >
+            ←
+          </Link>
+
+          <span className="room-nav__title">
+            paircode
+          </span>
+
+          <button
+            className="room-code-pill"
+            onClick={handleCopy}
+          >
+            {roomCode}
+
+            <span className="room-code-pill__action">
+              {copied ? "copied" : "copy"}
+            </span>
           </button>
+
         </div>
 
         <div className="room-nav__right">
-          <span className={`status-dot ${connected ? "status-dot--live" : ""}`} />
-          <span className="status-label">{connected ? "Connected" : "Connecting…"}</span>
+
+          <span
+            className={`status-dot ${
+              connected ? "status-dot--live" : ""
+            }`}
+          />
+
+          <span className="status-label">
+            {connected ? "Connected" : "Connecting…"}
+          </span>
 
           <div className="avatar-stack">
+
             {sortedUsers.slice(0, 5).map((id) => (
               <div
                 key={id}
                 className="avatar"
-                style={{ background: colorForId(id) }}
+                style={{
+                  background: colorForId(id)
+                }}
                 title={id === myId ? "You" : id}
               >
-                {id === myId ? "Y" : id.slice(0, 2).toUpperCase()}
+                {id === myId
+                  ? "Y"
+                  : id.slice(0, 2).toUpperCase()}
               </div>
             ))}
+
           </div>
+
         </div>
+
       </nav>
 
+      {/* ROOM BODY */}
+
       <div className="room-body">
+
+        {/* SIDEBAR */}
+
         <aside className="room-sidebar">
-          <p className="room-sidebar__label">In this room · {users.length}</p>
+
+          <p className="room-sidebar__label">
+            In this room · {users.length}
+          </p>
+
           <ul className="room-users">
+
             {sortedUsers.map((id) => (
-              <li key={id} className="room-user">
-                <span className="room-user__dot" style={{ background: colorForId(id) }} />
-                {id === myId ? "You" : id.slice(0, 8)}
+              <li
+                key={id}
+                className="room-user"
+              >
+                <span
+                  className="room-user__dot"
+                  style={{
+                    background: colorForId(id)
+                  }}
+                />
+
+                {id === myId
+                  ? "You"
+                  : id.slice(0, 8)}
               </li>
             ))}
+
           </ul>
+
         </aside>
 
+        {/* EDITOR */}
+
         <main className="room-editor-main">
+
+          {/* TOOLBAR */}
+
           <div className="file-tabs">
+
             <div className="file-tab file-tab--active">
               <span className="file-tab__dot" />
               main
             </div>
 
+            <button
+              className="run-button"
+              onClick={handleRun}
+              disabled={isRunning}
+            >
+              {isRunning ? (
+                <span className="run-button__spinner" />
+              ) : (
+                <svg
+                  width="10"
+                  height="12"
+                  viewBox="0 0 10 12"
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
+                  <path d="M0 0L10 6L0 12V0Z" />
+                </svg>
+              )}
+
+              {isRunning ? "Running…" : "Run"}
+            </button>
+
             <div className="language-select-wrapper">
-              <span className="language-select__dot" style={{ background: colorForId(language) }} />
+
+              <span
+                className="language-select__dot"
+                style={{
+                  background: colorForId(language)
+                }}
+              />
+
               <select
                 className="language-select"
                 value={language}
                 onChange={handleLanguageChange}
               >
                 {LANGUAGES.map((lang) => (
-                  <option key={lang.id} value={lang.id}>
+                  <option
+                    key={lang.id}
+                    value={lang.id}
+                  >
                     {lang.label}
                   </option>
                 ))}
               </select>
-              <svg className="language-select__chevron" width="10" height="6" viewBox="0 0 10 6" fill="none">
-                <path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+
+              <svg
+                className="language-select__chevron"
+                width="10"
+                height="6"
+                viewBox="0 0 10 6"
+                fill="none"
+                aria-hidden="true"
+              >
+                <path
+                  d="M1 1L5 5L9 1"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
               </svg>
+
             </div>
+
           </div>
 
+          {/* MONACO */}
+
           <div className="editor-wrapper">
+
             <Editor
               height="100%"
               language={language}
@@ -199,15 +468,110 @@ function RoomEditor() {
               options={{
                 fontSize: 14,
                 fontFamily: "'JetBrains Mono', monospace",
-                minimap: { enabled: false },
-                padding: { top: 16 },
+
+                minimap: {
+                  enabled: false
+                },
+
+                padding: {
+                  top: 16
+                },
+
                 smoothScrolling: true,
                 cursorBlinking: "smooth"
               }}
             />
+
           </div>
+
+          {/* OUTPUT PANEL */}
+
+          {panelOpen && (
+
+            <section
+              className={`output-panel ${
+                output
+                  ? output.exitCode === 0
+                    ? "output-panel--ok"
+                    : "output-panel--error"
+                  : ""
+              }`}
+            >
+
+              {/* HEADER */}
+
+              <div className="output-panel__header">
+
+                <span className="output-panel__title">
+                  Output
+                </span>
+
+                <button
+                  className="output-panel__close"
+                  onClick={() => setPanelOpen(false)}
+                  aria-label="Close output panel"
+                >
+                  ✕
+                </button>
+
+              </div>
+
+              {/* RESULT */}
+
+              {output && (
+
+                <div
+                  className={`output-panel__result ${
+                    output.exitCode === 0
+                      ? "output-panel__result--ok"
+                      : "output-panel__result--error"
+                  }`}
+                >
+
+                  <span className="output-panel__result-icon">
+                    {output.exitCode === 0 ? "✓" : "✕"}
+                  </span>
+
+                  <div className="output-panel__result-content">
+
+                    <span className="output-panel__result-text">
+                      {output.exitCode === 0
+                        ? "Ran successfully"
+                        : "Execution failed"}
+                    </span>
+
+                    {output.exitCode !== 0 &&
+                      output.stderr && (
+                        <span className="output-panel__error-message">
+                          {output.stderr}
+                        </span>
+                      )}
+
+                  </div>
+
+                </div>
+
+              )}
+
+              {/* LOADING */}
+
+              {isRunning && (
+
+                <div className="output-panel__loading">
+                  <span className="output-panel__loading-dot" />
+                  Running your code…
+                </div>
+
+              )}
+
+            </section>
+
+          )}
+
         </main>
+
       </div>
+
     </div>
   );
 }
