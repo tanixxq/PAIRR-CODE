@@ -44,10 +44,12 @@ function RoomEditor() {
   const socketRef = useSocket();
   const editorRef = useRef(null);
   const isRemoteUpdate = useRef(false);
+  const typingTimeoutRef = useRef(null);
 
   const { token } = useAuth();
 
   const [users, setUsers] = useState([]);
+  const [typingUsers, setTypingUsers] = useState([]);
   const [copied, setCopied] = useState(false);
   const [connected, setConnected] = useState(false);
   const [language, setLanguage] = useState("javascript");
@@ -111,12 +113,28 @@ function RoomEditor() {
       setLanguage(lang);
     };
 
+    const handleTypingStart = (userId) => {
+      setTypingUsers((current) =>
+        current.includes(userId)
+          ? current
+          : [...current, userId]
+      );
+    };
+    
+    const handleTypingStop = (userId) => {
+      setTypingUsers((current) =>
+        current.filter((id) => id !== userId)
+      );
+    };
+
     socket.on("connect", handleConnect);
     socket.on("disconnect", handleDisconnect);
     socket.on("room-users", handleRoomUsers);
     socket.on("init-state", handleInitState);
     socket.on("code-change", handleCodeChange);
     socket.on("language-change", handleLanguageChange);
+    socket.on("typing-start", handleTypingStart);
+    socket.on("typing-stop", handleTypingStop);
 
     if (socket.connected) {
       handleConnect();
@@ -129,6 +147,8 @@ function RoomEditor() {
       socket.off("init-state", handleInitState);
       socket.off("code-change", handleCodeChange);
       socket.off("language-change", handleLanguageChange);
+      socket.off("typing-start", handleTypingStart);
+      socket.off("typing-stop", handleTypingStop);
     };
   }, [roomCode, socketRef]);
 
@@ -142,14 +162,22 @@ function RoomEditor() {
 
   const handleEditorChange = (value) => {
     if (isRemoteUpdate.current) return;
-
+  
     const socket = socketRef.current;
-
+  
     if (socket) {
       socket.emit("code-change", {
         roomCode,
         code: value
       });
+  
+      socket.emit("typing-start", roomCode);
+  
+      clearTimeout(typingTimeoutRef.current);
+  
+      typingTimeoutRef.current = setTimeout(() => {
+        socket.emit("typing-stop", roomCode);
+      }, 1000);
     }
   };
 
@@ -466,35 +494,43 @@ function RoomEditor() {
 
           </div>
 
-          {/* MONACO */}
+          
+{/* MONACO */}
 
-          <div className="editor-wrapper">
+{/* TYPING INDICATOR */}
 
-            <Editor
-              height="100%"
-              language={language}
-              defaultValue="// start typing..."
-              theme="vs-dark"
-              onMount={handleEditorMount}
-              onChange={handleEditorChange}
-              options={{
-                fontSize: 14,
-                fontFamily: "'JetBrains Mono', monospace",
+{typingUsers.length > 0 && (
+  <div className="typing-indicator">
+    {typingUsers.length === 1
+      ? `${typingUsers[0].slice(0, 8)} is typing…`
+      : `${typingUsers.length} people are typing…`}
+  </div>
+)}
 
-                minimap: {
-                  enabled: false
-                },
+{/* MONACO */}
 
-                padding: {
-                  top: 16
-                },
-
-                smoothScrolling: true,
-                cursorBlinking: "smooth"
-              }}
-            />
-
-          </div>
+<div className="editor-wrapper">
+  <Editor
+    height="100%"
+    language={language}
+    defaultValue="// start typing..."
+    theme="vs-dark"
+    onMount={handleEditorMount}
+    onChange={handleEditorChange}
+    options={{
+      fontSize: 14,
+      fontFamily: "'JetBrains Mono', monospace",
+      minimap: {
+        enabled: false
+      },
+      padding: {
+        top: 16
+      },
+      smoothScrolling: true,
+      cursorBlinking: "smooth"
+    }}
+  />
+</div>
 
           {/* INPUT + OUTPUT PANELS */}
 

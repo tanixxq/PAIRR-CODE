@@ -731,3 +731,12 @@
 .input-panel__textarea::placeholder {
   opacity: 0.4;
 }
+.typing-indicator {
+  flex-shrink: 0;
+  padding: 6px 16px;
+
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+
+  opacity: 0.55;
+}
