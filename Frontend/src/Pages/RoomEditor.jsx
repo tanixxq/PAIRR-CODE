@@ -202,6 +202,15 @@ function RoomEditor() {
     }
 
     const code = editor.getValue();
+    if (!code.trim()) {
+      setPanelOpen(true);
+      setOutput({
+        stdout: "",
+        stderr: "Write some code first.",
+        exitCode: 1
+      });
+      return;
+    }
 
     setIsRunning(true);
     setPanelOpen(true);
