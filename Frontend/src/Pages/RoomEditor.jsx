@@ -1,3 +1,4 @@
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useSocket } from "../Hooks/useSocket.js";
@@ -52,6 +53,7 @@ function RoomEditor() {
   const [language, setLanguage] = useState("javascript");
 
   const [output, setOutput] = useState(null);
+  const [input, setInput] = useState("");
   const [isRunning, setIsRunning] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
 
@@ -116,7 +118,6 @@ function RoomEditor() {
     socket.on("code-change", handleCodeChange);
     socket.on("language-change", handleLanguageChange);
 
-    // If socket was already connected before this effect ran
     if (socket.connected) {
       handleConnect();
     }
@@ -202,6 +203,7 @@ function RoomEditor() {
     }
 
     const code = editor.getValue();
+
     if (!code.trim()) {
       setPanelOpen(true);
       setOutput({
@@ -221,7 +223,8 @@ function RoomEditor() {
         `${API_URL}/execute`,
         {
           language,
-          code
+          code,
+          input
         },
         {
           headers: {
@@ -493,86 +496,124 @@ function RoomEditor() {
 
           </div>
 
-          {/* OUTPUT PANEL */}
+          {/* INPUT + OUTPUT PANELS */}
 
           {panelOpen && (
 
-            <section
-              className={`output-panel ${
-                output
-                  ? output.exitCode === 0
-                    ? "output-panel--ok"
-                    : "output-panel--error"
-                  : ""
-              }`}
-            >
+            <>
 
-              {/* HEADER */}
+              {/* INPUT PANEL */}
 
-              <div className="output-panel__header">
+              <div className="input-panel">
 
-                <span className="output-panel__title">
-                  Output
-                </span>
+                <div className="input-panel__header">
 
-                <button
-                  className="output-panel__close"
-                  onClick={() => setPanelOpen(false)}
-                  aria-label="Close output panel"
-                >
-                  ✕
-                </button>
+                  <span className="input-panel__title">
+                    Input
+                  </span>
+
+                </div>
+
+                <textarea
+                  className="input-panel__textarea"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  placeholder="Enter input for your program..."
+                  spellCheck="false"
+                />
 
               </div>
 
-              {/* RESULT */}
+              {/* OUTPUT PANEL */}
 
-              {output && (
-  <div
-    className={`output-panel__result ${
-      output.exitCode === 0
-        ? "output-panel__result--ok"
-        : "output-panel__result--error"
-    }`}
-  >
-    <span className="output-panel__result-icon">
-      {output.exitCode === 0 ? "✓" : "✕"}
-    </span>
+              <section
+                className={`output-panel ${
+                  output
+                    ? output.exitCode === 0
+                      ? "output-panel--ok"
+                      : "output-panel--error"
+                    : ""
+                }`}
+              >
 
-    <div className="output-panel__result-content">
-      <span className="output-panel__result-text">
-        {output.exitCode === 0
-          ? "Ran successfully"
-          : "Execution failed"}
-      </span>
+                {/* HEADER */}
 
-      {output.exitCode === 0 && output.stdout && (
-        <pre className="output-panel__stdout">
-          {output.stdout}
-        </pre>
-      )}
+                <div className="output-panel__header">
 
-      {output.exitCode !== 0 && output.stderr && (
-        <span className="output-panel__error-message">
-          {output.stderr}
-        </span>
-      )}
-    </div>
-  </div>
-)}
+                  <span className="output-panel__title">
+                    Output
+                  </span>
 
-              {/* LOADING */}
+                  <button
+                    className="output-panel__close"
+                    onClick={() => setPanelOpen(false)}
+                    aria-label="Close output panel"
+                  >
+                    ✕
+                  </button>
 
-              {isRunning && (
-
-                <div className="output-panel__loading">
-                  <span className="output-panel__loading-dot" />
-                  Running your code…
                 </div>
 
-              )}
+                {/* RESULT */}
 
-            </section>
+                {output && (
+
+                  <div
+                    className={`output-panel__result ${
+                      output.exitCode === 0
+                        ? "output-panel__result--ok"
+                        : "output-panel__result--error"
+                    }`}
+                  >
+
+                    <span className="output-panel__result-icon">
+                      {output.exitCode === 0 ? "✓" : "✕"}
+                    </span>
+
+                    <div className="output-panel__result-content">
+
+                      <span className="output-panel__result-text">
+                        {output.exitCode === 0
+                          ? "Ran successfully"
+                          : "Execution failed"}
+                      </span>
+
+                      {output.exitCode === 0 && output.stdout && (
+
+                        <pre className="output-panel__stdout">
+                          {output.stdout}
+                        </pre>
+
+                      )}
+
+                      {output.exitCode !== 0 && output.stderr && (
+
+                        <span className="output-panel__error-message">
+                          {output.stderr}
+                        </span>
+
+                      )}
+
+                    </div>
+
+                  </div>
+
+                )}
+
+                {/* LOADING */}
+
+                {isRunning && (
+
+                  <div className="output-panel__loading">
+                    <span className="output-panel__loading-dot" />
+                    Running your code…
+                  </div>
+
+                )}
+
+              </section>
+
+            </>
 
           )}
 
@@ -585,3 +626,4 @@ function RoomEditor() {
 }
 
 export default RoomEditor;
+
