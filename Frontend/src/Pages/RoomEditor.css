@@ -740,3 +740,10 @@
 
   opacity: 0.55;
 }
+.room-user__owner {
+  margin-left: auto;
+  font-size: 10px;
+  opacity: 0.5;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}

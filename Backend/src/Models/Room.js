@@ -7,15 +7,18 @@ const roomSchema = new mongoose.Schema(
             required: true,
             unique: true
         },
+
         name: {
             type: String,
             trim: true
         },
+
         createdBy: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "User",
             required: true
         },
+
         members: [
             {
                 type: mongoose.Schema.Types.ObjectId,
@@ -23,6 +26,7 @@ const roomSchema = new mongoose.Schema(
             }
         ]
     },
+
     { timestamps: true }
 );
 

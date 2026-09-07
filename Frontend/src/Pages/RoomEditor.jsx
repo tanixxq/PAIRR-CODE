@@ -1,4 +1,3 @@
-
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useSocket } from "../Hooks/useSocket.js";
@@ -40,20 +39,18 @@ function colorForId(id) {
 
 function RoomEditor() {
   const { roomCode } = useParams();
+  const { token } = useAuth();
+  const socketRef = useSocket(token);
 
-  const socketRef = useSocket();
   const editorRef = useRef(null);
   const isRemoteUpdate = useRef(false);
   const typingTimeoutRef = useRef(null);
-
-  const { token } = useAuth();
 
   const [users, setUsers] = useState([]);
   const [typingUsers, setTypingUsers] = useState([]);
   const [copied, setCopied] = useState(false);
   const [connected, setConnected] = useState(false);
   const [language, setLanguage] = useState("javascript");
-
   const [output, setOutput] = useState(null);
   const [input, setInput] = useState("");
   const [isRunning, setIsRunning] = useState(false);
@@ -86,7 +83,9 @@ function RoomEditor() {
 
       if (editor && code) {
         isRemoteUpdate.current = true;
+
         editor.setValue(code);
+
         isRemoteUpdate.current = false;
       }
 
@@ -105,7 +104,9 @@ function RoomEditor() {
       if (current === code) return;
 
       isRemoteUpdate.current = true;
+
       editor.setValue(code);
+
       isRemoteUpdate.current = false;
     };
 
@@ -120,12 +121,20 @@ function RoomEditor() {
           : [...current, userId]
       );
     };
-    
+
     const handleTypingStop = (userId) => {
       setTypingUsers((current) =>
         current.filter((id) => id !== userId)
       );
     };
+
+    const handleMemberRemoved = () => {
+      console.log("🚫 You were removed from the room");
+  
+      socket.disconnect();
+  
+      window.location.href = "/dashboard";
+  };
 
     socket.on("connect", handleConnect);
     socket.on("disconnect", handleDisconnect);
@@ -135,6 +144,7 @@ function RoomEditor() {
     socket.on("language-change", handleLanguageChange);
     socket.on("typing-start", handleTypingStart);
     socket.on("typing-stop", handleTypingStop);
+    socket.on("member-removed", handleMemberRemoved);
 
     if (socket.connected) {
       handleConnect();
@@ -149,6 +159,7 @@ function RoomEditor() {
       socket.off("language-change", handleLanguageChange);
       socket.off("typing-start", handleTypingStart);
       socket.off("typing-stop", handleTypingStop);
+      socket.off("member-removed", handleMemberRemoved);
     };
   }, [roomCode, socketRef]);
 
@@ -162,19 +173,19 @@ function RoomEditor() {
 
   const handleEditorChange = (value) => {
     if (isRemoteUpdate.current) return;
-  
+
     const socket = socketRef.current;
-  
+
     if (socket) {
       socket.emit("code-change", {
         roomCode,
         code: value
       });
-  
+
       socket.emit("typing-start", roomCode);
-  
+
       clearTimeout(typingTimeoutRef.current);
-  
+
       typingTimeoutRef.current = setTimeout(() => {
         socket.emit("typing-stop", roomCode);
       }, 1000);
@@ -214,9 +225,14 @@ function RoomEditor() {
         setCopied(false);
       }, 1500);
     } catch (error) {
-      console.error("Failed to copy room code:", error);
+      console.error(
+        "Failed to copy room code:",
+        error
+      );
     }
   };
+
+  
 
   // =========================
   // RUN CODE
@@ -234,11 +250,13 @@ function RoomEditor() {
 
     if (!code.trim()) {
       setPanelOpen(true);
+
       setOutput({
         stdout: "",
         stderr: "Write some code first.",
         exitCode: 1
       });
+
       return;
     }
 
@@ -262,15 +280,22 @@ function RoomEditor() {
         }
       );
 
-      console.log("EXECUTE RESPONSE:", res.data);
+      console.log(
+        "EXECUTE RESPONSE:",
+        res.data
+      );
 
       setOutput({
         stdout: res.data.stdout || "",
         stderr: res.data.stderr || "",
         exitCode: res.data.exitCode
       });
+
     } catch (error) {
-      console.error("Execution error:", error);
+      console.error(
+        "Execution error:",
+        error
+      );
 
       const timedOut =
         error.code === "ECONNABORTED" ||
@@ -282,9 +307,11 @@ function RoomEditor() {
           ? `Execution timed out after ${
               RUN_TIMEOUT_MS / 1000
             }s — check for an infinite loop.`
-          : error.response?.data?.message || "Execution failed",
+          : error.response?.data?.message ||
+            "Execution failed",
         exitCode: 1
       });
+
     } finally {
       setIsRunning(false);
     }
@@ -299,11 +326,17 @@ function RoomEditor() {
   const sortedUsers = useMemo(
     () =>
       [...users].sort((a, b) => {
-        if (a === myId) return -1;
-        if (b === myId) return 1;
+        if (a.socketId === myId) return -1;
+
+        if (b.socketId === myId) return 1;
+
         return 0;
       }),
     [users, myId]
+  );
+
+  const currentUser = users.find(
+    (user) => user.socketId === myId
   );
 
   // =========================
@@ -347,30 +380,47 @@ function RoomEditor() {
 
           <span
             className={`status-dot ${
-              connected ? "status-dot--live" : ""
+              connected
+                ? "status-dot--live"
+                : ""
             }`}
           />
 
           <span className="status-label">
-            {connected ? "Connected" : "Connecting…"}
+            {connected
+              ? "Connected"
+              : "Connecting…"}
           </span>
 
           <div className="avatar-stack">
 
-            {sortedUsers.slice(0, 5).map((id) => (
-              <div
-                key={id}
-                className="avatar"
-                style={{
-                  background: colorForId(id)
-                }}
-                title={id === myId ? "You" : id}
-              >
-                {id === myId
-                  ? "Y"
-                  : id.slice(0, 2).toUpperCase()}
-              </div>
-            ))}
+            {sortedUsers
+              .slice(0, 5)
+              .map((user) => (
+
+                <div
+                  key={user.socketId}
+                  className="avatar"
+                  style={{
+                    background:
+                      colorForId(
+                        user.socketId
+                      )
+                  }}
+                  title={
+                    user.socketId === myId
+                      ? "You"
+                      : user.socketId
+                  }
+                >
+                  {user.socketId === myId
+                    ? "Y"
+                    : user.socketId
+                        .slice(0, 2)
+                        .toUpperCase()}
+                </div>
+
+              ))}
 
           </div>
 
@@ -392,22 +442,58 @@ function RoomEditor() {
 
           <ul className="room-users">
 
-            {sortedUsers.map((id) => (
+            {sortedUsers.map((user) => (
+
               <li
-                key={id}
+                key={user.socketId}
                 className="room-user"
               >
+
                 <span
                   className="room-user__dot"
                   style={{
-                    background: colorForId(id)
+                    background:
+                      colorForId(
+                        user.socketId
+                      )
                   }}
                 />
 
-                {id === myId
-                  ? "You"
-                  : id.slice(0, 8)}
+                <span>
+                  {user.socketId === myId
+                    ? "You"
+                    : user.socketId.slice(0, 8)}
+                </span>
+
+                {user.isOwner && (
+                  <span className="room-user__owner">
+                    Owner
+                  </span>
+                )}
+
+                {currentUser?.isOwner &&
+                  user.socketId !== myId && (
+
+                    <button
+                      className="room-user__remove"
+                      onClick={() =>
+                        socketRef.current?.emit(
+                          "remove-member",
+                          {
+                            roomCode,
+                            targetSocketId:
+                              user.socketId
+                          }
+                        )
+                      }
+                    >
+                      Remove
+                    </button>
+
+                )}
+
               </li>
+
             ))}
 
           </ul>
@@ -423,8 +509,11 @@ function RoomEditor() {
           <div className="file-tabs">
 
             <div className="file-tab file-tab--active">
+
               <span className="file-tab__dot" />
+
               main
+
             </div>
 
             <button
@@ -432,9 +521,13 @@ function RoomEditor() {
               onClick={handleRun}
               disabled={isRunning}
             >
+
               {isRunning ? (
+
                 <span className="run-button__spinner" />
+
               ) : (
+
                 <svg
                   width="10"
                   height="12"
@@ -444,9 +537,13 @@ function RoomEditor() {
                 >
                   <path d="M0 0L10 6L0 12V0Z" />
                 </svg>
+
               )}
 
-              {isRunning ? "Running…" : "Run"}
+              {isRunning
+                ? "Running…"
+                : "Run"}
+
             </button>
 
             <div className="language-select-wrapper">
@@ -454,23 +551,30 @@ function RoomEditor() {
               <span
                 className="language-select__dot"
                 style={{
-                  background: colorForId(language)
+                  background:
+                    colorForId(language)
                 }}
               />
 
               <select
                 className="language-select"
                 value={language}
-                onChange={handleLanguageChange}
+                onChange={
+                  handleLanguageChange
+                }
               >
+
                 {LANGUAGES.map((lang) => (
+
                   <option
                     key={lang.id}
                     value={lang.id}
                   >
                     {lang.label}
                   </option>
+
                 ))}
+
               </select>
 
               <svg
@@ -481,6 +585,7 @@ function RoomEditor() {
                 fill="none"
                 aria-hidden="true"
               >
+
                 <path
                   d="M1 1L5 5L9 1"
                   stroke="currentColor"
@@ -488,49 +593,57 @@ function RoomEditor() {
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 />
+
               </svg>
 
             </div>
 
           </div>
 
-          
-{/* MONACO */}
+          {/* TYPING INDICATOR */}
 
-{/* TYPING INDICATOR */}
+          {typingUsers.length > 0 && (
 
-{typingUsers.length > 0 && (
-  <div className="typing-indicator">
-    {typingUsers.length === 1
-      ? `${typingUsers[0].slice(0, 8)} is typing…`
-      : `${typingUsers.length} people are typing…`}
-  </div>
-)}
+            <div className="typing-indicator">
 
-{/* MONACO */}
+              {typingUsers.length === 1
+                ? `${typingUsers[0].slice(
+                    0,
+                    8
+                  )} is typing…`
+                : `${typingUsers.length} people are typing…`}
 
-<div className="editor-wrapper">
-  <Editor
-    height="100%"
-    language={language}
-    defaultValue="// start typing..."
-    theme="vs-dark"
-    onMount={handleEditorMount}
-    onChange={handleEditorChange}
-    options={{
-      fontSize: 14,
-      fontFamily: "'JetBrains Mono', monospace",
-      minimap: {
-        enabled: false
-      },
-      padding: {
-        top: 16
-      },
-      smoothScrolling: true,
-      cursorBlinking: "smooth"
-    }}
-  />
-</div>
+            </div>
+
+          )}
+
+          {/* MONACO */}
+
+          <div className="editor-wrapper">
+
+            <Editor
+              height="100%"
+              language={language}
+              defaultValue="// start typing..."
+              theme="vs-dark"
+              onMount={handleEditorMount}
+              onChange={handleEditorChange}
+              options={{
+                fontSize: 14,
+                fontFamily:
+                  "'JetBrains Mono', monospace",
+                minimap: {
+                  enabled: false
+                },
+                padding: {
+                  top: 16
+                },
+                smoothScrolling: true,
+                cursorBlinking: "smooth"
+              }}
+            />
+
+          </div>
 
           {/* INPUT + OUTPUT PANELS */}
 
@@ -553,7 +666,9 @@ function RoomEditor() {
                 <textarea
                   className="input-panel__textarea"
                   value={input}
-                  onChange={(e) => setInput(e.target.value)}
+                  onChange={(e) =>
+                    setInput(e.target.value)
+                  }
                   placeholder="Enter input for your program..."
                   spellCheck="false"
                 />
@@ -582,7 +697,9 @@ function RoomEditor() {
 
                   <button
                     className="output-panel__close"
-                    onClick={() => setPanelOpen(false)}
+                    onClick={() =>
+                      setPanelOpen(false)
+                    }
                     aria-label="Close output panel"
                   >
                     ✕
@@ -603,7 +720,9 @@ function RoomEditor() {
                   >
 
                     <span className="output-panel__result-icon">
-                      {output.exitCode === 0 ? "✓" : "✕"}
+                      {output.exitCode === 0
+                        ? "✓"
+                        : "✕"}
                     </span>
 
                     <div className="output-panel__result-content">
@@ -614,21 +733,23 @@ function RoomEditor() {
                           : "Execution failed"}
                       </span>
 
-                      {output.exitCode === 0 && output.stdout && (
+                      {output.exitCode === 0 &&
+                        output.stdout && (
 
-                        <pre className="output-panel__stdout">
-                          {output.stdout}
-                        </pre>
+                          <pre className="output-panel__stdout">
+                            {output.stdout}
+                          </pre>
 
-                      )}
+                        )}
 
-                      {output.exitCode !== 0 && output.stderr && (
+                      {output.exitCode !== 0 &&
+                        output.stderr && (
 
-                        <span className="output-panel__error-message">
-                          {output.stderr}
-                        </span>
+                          <span className="output-panel__error-message">
+                            {output.stderr}
+                          </span>
 
-                      )}
+                        )}
 
                     </div>
 
@@ -641,8 +762,11 @@ function RoomEditor() {
                 {isRunning && (
 
                   <div className="output-panel__loading">
+
                     <span className="output-panel__loading-dot" />
+
                     Running your code…
+
                   </div>
 
                 )}
@@ -662,4 +786,3 @@ function RoomEditor() {
 }
 
 export default RoomEditor;
-
