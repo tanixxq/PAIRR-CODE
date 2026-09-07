@@ -747,3 +747,73 @@
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
+.room-username {
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.room-username__display {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+
+  font-size: 13px;
+}
+
+.room-username__display > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.room-username__edit-button,
+.room-username__save {
+  flex-shrink: 0;
+
+  border: 0;
+  background: transparent;
+  color: inherit;
+
+  font-family: inherit;
+  font-size: 11px;
+  cursor: pointer;
+
+  opacity: 0.5;
+}
+
+.room-username__edit-button:hover,
+.room-username__save:hover {
+  opacity: 1;
+}
+
+.room-username__edit {
+  display: flex;
+  gap: 8px;
+}
+
+.room-username__input {
+  min-width: 0;
+  flex: 1;
+
+  padding: 7px 9px;
+
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+
+  color: inherit;
+  font-family: inherit;
+  font-size: 12px;
+
+  outline: none;
+}
+
+.room-username__input:focus {
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.room-username__save {
+  padding: 0 4px;
+}

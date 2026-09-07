@@ -55,6 +55,9 @@ function RoomEditor() {
   const [input, setInput] = useState("");
   const [isRunning, setIsRunning] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
+  const [username, setUsername] = useState("");
+  const [editingUsername, setEditingUsername] = useState(false);
+  const [usernameInput, setUsernameInput] = useState("");
 
   // =========================
   // SOCKET EVENTS
@@ -75,8 +78,20 @@ function RoomEditor() {
     };
 
     const handleRoomUsers = (userList) => {
+      console.log("ROOM USERS:", userList);
+  
       setUsers(userList);
-    };
+  
+      const socketId = socketRef.current?.id;
+  
+      const me = userList.find(
+          (user) => user.socketId === socketId
+      );
+  
+      if (me) {
+          setUsername(me.username);
+      }
+  };
 
     const handleInitState = ({ code, language: lang }) => {
       const editor = editorRef.current;
@@ -231,6 +246,39 @@ function RoomEditor() {
       );
     }
   };
+
+  const startEditingUsername = () => {
+    setUsernameInput(username);
+    setEditingUsername(true);
+};
+
+const handleSaveUsername = async () => {
+  try {
+      const response = await axios.patch(
+          `${API_URL}/auth/username`,
+          {
+              username: usernameInput
+          },
+          {
+              headers: {
+                  Authorization: `Bearer ${token}`
+              }
+          }
+      );
+
+      setUsername(response.data.user.username);
+
+      socketRef.current?.emit("username-updated");
+
+      setEditingUsername(false);
+
+  } catch (error) {
+      console.error(
+          "Failed to update username:",
+          error.response?.data || error.message
+      );
+  }
+};
 
   
 
@@ -410,12 +458,12 @@ function RoomEditor() {
                   title={
                     user.socketId === myId
                       ? "You"
-                      : user.socketId
+                      : user.username
                   }
                 >
                   {user.socketId === myId
                     ? "Y"
-                    : user.socketId
+                    : user.username
                         .slice(0, 2)
                         .toUpperCase()}
                 </div>
@@ -440,6 +488,42 @@ function RoomEditor() {
             In this room · {users.length}
           </p>
 
+          <div className="room-username">
+  {editingUsername ? (
+    <div className="room-username__edit">
+      <input
+        className="room-username__input"
+        value={usernameInput}
+        onChange={(e) =>
+          setUsernameInput(e.target.value)
+        }
+        autoFocus
+        maxLength={20}
+      />
+
+      <button
+        className="room-username__save"
+        onClick={handleSaveUsername}
+      >
+        Save
+      </button>
+    </div>
+  ) : (
+    <div className="room-username__display">
+      <span>
+        {username || "Loading..."}
+      </span>
+
+      <button
+        className="room-username__edit-button"
+        onClick={startEditingUsername}
+      >
+        Edit
+      </button>
+    </div>
+  )}
+</div>
+
           <ul className="room-users">
 
             {sortedUsers.map((user) => (
@@ -462,7 +546,7 @@ function RoomEditor() {
                 <span>
                   {user.socketId === myId
                     ? "You"
-                    : user.socketId.slice(0, 8)}
+                    : user.username}
                 </span>
 
                 {user.isOwner && (

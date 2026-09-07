@@ -8,6 +8,7 @@ import app from "./src/App.js";
 import { connectDB } from "./src/config/db.js";
 import jwt from "jsonwebtoken";
 import Room from "./src/Models/Room.js";
+import User from "./src/Models/User.js";
 
 connectDB();
 
@@ -23,7 +24,7 @@ const io = new Server(server, {
 // SOCKET AUTHENTICATION
 // =========================
 
-io.use((socket, next) => {
+io.use(async (socket, next) => {
     const token = socket.handshake.auth.token;
 
     if (!token) {
@@ -36,9 +37,17 @@ io.use((socket, next) => {
             process.env.JWT_SECRET
         );
 
+        const user = await User.findById(decoded.id);
+
+        if (!user) {
+            return next(new Error("Not authorized, user not found"));
+        }
+
         socket.data.userId = decoded.id;
+        socket.data.username = user.username;
 
         next();
+
     } catch (error) {
         next(new Error("Not authorized, invalid token"));
     }
@@ -50,19 +59,44 @@ const roomMembers = new Map();
 const roomState = new Map();
 // roomCode -> { code, language }
 
-const getRoomList = (roomCode) =>
-    Array.from(roomMembers.get(roomCode) || []).map(
-        (socketId) => {
-            const memberSocket =
-                io.sockets.sockets.get(socketId);
+const getRoomList = (roomCode) => {
+    const members = roomMembers.get(roomCode);
 
-            return {
-                socketId,
-                userId: memberSocket?.data.userId,
-                isOwner: memberSocket?.data.isOwner
-            };
+    if (!members) {
+        return [];
+    }
+
+    const users = [];
+
+    for (const socketId of members) {
+        const memberSocket =
+            io.sockets.sockets.get(socketId);
+
+        if (!memberSocket) {
+            members.delete(socketId);
+            continue;
         }
-    );
+
+        if (!memberSocket.data.username) {
+            console.log(
+                "Invalid socket in ROOM MEMBERS:",
+                socketId
+            );
+
+            members.delete(socketId);
+            continue;
+        }
+
+        users.push({
+            socketId,
+            userId: memberSocket.data.userId,
+            username: memberSocket.data.username,
+            isOwner: memberSocket.data.isOwner
+        });
+    }
+
+    return users;
+};
 
 io.on("connection", (socket) => {
 
@@ -208,6 +242,38 @@ io.on("connection", (socket) => {
     );
 
     // =========================
+// USERNAME UPDATE
+// =========================
+
+socket.on("username-updated", async () => {
+    console.log("USERNAME UPDATE RECEIVED:", socket.id);
+
+    const user = await User.findById(socket.data.userId);
+
+    if (!user) {
+        console.log("USER NOT FOUND");
+        return;
+    }
+
+    console.log("NEW USERNAME FROM DB:", user.username);
+
+    socket.data.username = user.username;
+
+    const roomCode = socket.data.roomCode;
+
+    console.log("ROOM CODE:", roomCode);
+
+    if (roomCode) {
+        console.log("BROADCASTING UPDATED USERS");
+
+        io.to(roomCode).emit(
+            "room-users",
+            getRoomList(roomCode)
+        );
+    }
+});
+
+    // =========================
     // CODE CHANGE
     // =========================
 
@@ -302,53 +368,35 @@ io.on("connection", (socket) => {
     // =========================
 
     socket.on("disconnecting", () => {
-
         console.log(
             `⚠️ Client disconnecting: ${socket.id}`
         );
-
-        const roomCode =
-            socket.data.roomCode;
-
-        if (
-            roomCode &&
-            roomMembers.has(roomCode)
-        ) {
-
-            roomMembers
-                .get(roomCode)
-                .delete(socket.id);
-
-            if (
-                roomMembers
-                    .get(roomCode)
-                    .size === 0
-            ) {
-
-                roomMembers.delete(roomCode);
-
-                roomState.delete(roomCode);
-
-            } else {
-
-                socket
-                    .to(roomCode)
-                    .emit(
-                        "room-users",
-                        getRoomList(roomCode)
-                    );
-
-                // Make sure other users don't keep
-                // showing this disconnected user as typing
-
-                socket
-                    .to(roomCode)
-                    .emit(
-                        "typing-stop",
-                        socket.id
-                    );
-            }
+    
+        const roomCode = socket.data.roomCode;
+    
+        if (!roomCode || !roomMembers.has(roomCode)) {
+            return;
         }
+    
+        const members = roomMembers.get(roomCode);
+    
+        members.delete(socket.id);
+    
+        if (members.size === 0) {
+            roomMembers.delete(roomCode);
+            roomState.delete(roomCode);
+            return;
+        }
+    
+        socket.to(roomCode).emit(
+            "room-users",
+            getRoomList(roomCode)
+        );
+    
+        socket.to(roomCode).emit(
+            "typing-stop",
+            socket.id
+        );
     });
 
     socket.on("disconnect", () => {

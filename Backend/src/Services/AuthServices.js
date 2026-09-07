@@ -49,3 +49,17 @@ export const loginUser = async ({ email, password }) => {
         }
     };
 };
+
+export const updateUsername = async ({ userId, username }) => {
+    const user = await User.findById(userId);
+
+    if (!user) {
+        throw new Error("User not found");
+    }
+
+    user.username = username.trim();
+
+    await user.save();
+
+    return user;
+};
