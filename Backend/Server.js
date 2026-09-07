@@ -150,8 +150,6 @@ io.on("connection", (socket) => {
             getRoomList(roomCode)
         );
 
-        // Catch this new joiner up on
-        // the room's current code + language
 
         const state = roomState.get(roomCode);
 
