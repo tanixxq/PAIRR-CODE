@@ -681,3 +681,11 @@
     padding: 0 10px;
   }
 }
+.output-panel__stdout {
+  margin: 10px 0 0;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

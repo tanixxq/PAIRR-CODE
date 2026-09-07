@@ -528,39 +528,38 @@ function RoomEditor() {
               {/* RESULT */}
 
               {output && (
+  <div
+    className={`output-panel__result ${
+      output.exitCode === 0
+        ? "output-panel__result--ok"
+        : "output-panel__result--error"
+    }`}
+  >
+    <span className="output-panel__result-icon">
+      {output.exitCode === 0 ? "✓" : "✕"}
+    </span>
 
-                <div
-                  className={`output-panel__result ${
-                    output.exitCode === 0
-                      ? "output-panel__result--ok"
-                      : "output-panel__result--error"
-                  }`}
-                >
+    <div className="output-panel__result-content">
+      <span className="output-panel__result-text">
+        {output.exitCode === 0
+          ? "Ran successfully"
+          : "Execution failed"}
+      </span>
 
-                  <span className="output-panel__result-icon">
-                    {output.exitCode === 0 ? "✓" : "✕"}
-                  </span>
+      {output.exitCode === 0 && output.stdout && (
+        <pre className="output-panel__stdout">
+          {output.stdout}
+        </pre>
+      )}
 
-                  <div className="output-panel__result-content">
-
-                    <span className="output-panel__result-text">
-                      {output.exitCode === 0
-                        ? "Ran successfully"
-                        : "Execution failed"}
-                    </span>
-
-                    {output.exitCode !== 0 &&
-                      output.stderr && (
-                        <span className="output-panel__error-message">
-                          {output.stderr}
-                        </span>
-                      )}
-
-                  </div>
-
-                </div>
-
-              )}
+      {output.exitCode !== 0 && output.stderr && (
+        <span className="output-panel__error-message">
+          {output.stderr}
+        </span>
+      )}
+    </div>
+  </div>
+)}
 
               {/* LOADING */}
 
